@@ -3,7 +3,8 @@ import json
 import websockets
 import sounddevice as sd
 import numpy as np
-
+from engine.rvc_engine import RVCEngine
+engine = RVCEngine()
 HOST = "127.0.0.1"
 PORT = 8765
 
@@ -63,7 +64,16 @@ async def handle_message(websocket, data):
 
     elif msg_type == "start_stream":
         await start_audio_stream(websocket)
+    elif msg_type == "load_model":
+        pth_path = data.get("payload")
+        await handle_load_model(websocket, pth_path)
 
+    elif msg_type == "get_model_info":
+        if engine.model_info:
+            await websocket.send(json.dumps({
+                "type": "model_info",
+                "payload": engine.model_info
+            }))
     elif msg_type == "stop_stream":
         await stop_audio_stream()
         await websocket.send(json.dumps({"type": "stream_stopped"}))
@@ -135,6 +145,26 @@ async def stop_audio_stream():
         audio_stream.stop()
         audio_stream.close()
         audio_stream = None
+        
+async def handle_load_model(websocket, pth_path: str):
+    await websocket.send(json.dumps({
+        "type": "model_loading",
+        "payload": {"status": "loading", "path": pth_path}
+    }))
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, engine.load_model, pth_path)
+
+    if result["success"]:
+        await websocket.send(json.dumps({
+            "type": "model_loaded",
+            "payload": result["info"]
+        }))
+    else:
+        await websocket.send(json.dumps({
+            "type": "model_error",
+            "payload": result["error"]
+        }))
 
 async def main():
     print(f"[Zer0Voices] Sidecar starting on ws://{HOST}:{PORT}")
