@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSocket } from "./hooks/useSocket";
+import { MainScreen } from "./components/main/MainScreen";
 
 type Screen = "main" | "models" | "browse" | "soundboard" | "settings";
 
@@ -57,31 +58,19 @@ function App() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden p-4">
-        {screen === "main" && (
-          <div className="flex items-center justify-center h-full text-zinc-500">
-            Main screen coming soon
-          </div>
-        )}
+      <div className="flex-1 overflow-hidden p-3">
+        {screen === "main" && <MainScreen />}
         {screen === "models" && (
-          <div className="flex items-center justify-center h-full text-zinc-500">
-            Model Manager coming soon
-          </div>
+          <div className="flex items-center justify-center h-full text-zinc-500">Model Manager coming soon</div>
         )}
         {screen === "browse" && (
-          <div className="flex items-center justify-center h-full text-zinc-500">
-            Browse Models coming soon
-          </div>
+          <div className="flex items-center justify-center h-full text-zinc-500">Browse Models coming soon</div>
         )}
         {screen === "soundboard" && (
-          <div className="flex items-center justify-center h-full text-zinc-500">
-            Soundboard coming soon
-          </div>
+          <div className="flex items-center justify-center h-full text-zinc-500">Soundboard coming soon</div>
         )}
         {screen === "settings" && (
-          <div className="flex items-center justify-center h-full text-zinc-500">
-            Settings coming soon
-          </div>
+          <div className="flex items-center justify-center h-full text-zinc-500">Settings coming soon</div>
         )}
       </div>
 
