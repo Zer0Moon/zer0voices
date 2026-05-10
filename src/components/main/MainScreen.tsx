@@ -47,7 +47,10 @@ export function MainScreen() {
 
     on("stream_started", () => setIsStreaming(true));
     on("stream_stopped", () => setIsStreaming(false));
-  }, [on]);
+
+    // Request devices on mount
+    send("get_devices");
+  }, [on, send]);
 
   const drawWaveform = useCallback(() => {
     const canvas = canvasRef.current;
