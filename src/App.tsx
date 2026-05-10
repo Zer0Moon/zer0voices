@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSocket } from "./hooks/useSocket";
 import { MainScreen } from "./components/main/MainScreen";
+import { ModelManager } from "./components/models/ModelManager";
 
 type Screen = "main" | "models" | "browse" | "soundboard" | "settings";
 
@@ -60,9 +61,7 @@ function App() {
 
       <div className="flex-1 overflow-hidden p-3">
         {screen === "main" && <MainScreen />}
-        {screen === "models" && (
-          <div className="flex items-center justify-center h-full text-zinc-500">Model Manager coming soon</div>
-        )}
+        {screen === "models" && <ModelManager />}
         {screen === "browse" && (
           <div className="flex items-center justify-center h-full text-zinc-500">Browse Models coming soon</div>
         )}
