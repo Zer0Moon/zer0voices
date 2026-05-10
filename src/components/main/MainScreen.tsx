@@ -49,7 +49,8 @@ export function MainScreen() {
     on("stream_stopped", () => setIsStreaming(false));
 
     // Request devices on mount
-    send("get_devices");
+    // Request devices on mount — small delay to ensure listener is registered
+    setTimeout(() => send("get_devices"), 300);
   }, [on, send]);
 
   const drawWaveform = useCallback(() => {
@@ -107,11 +108,13 @@ export function MainScreen() {
   const toggleStream = () => {
     if (isStreaming) {
       send("stop_stream");
+      send("set_converting", false);
       setIsConverting(false);
     } else {
       if (selectedInput !== null) send("set_input_device", selectedInput);
       if (selectedOutput !== null) send("set_output_device", selectedOutput);
       send("start_stream");
+      send("set_converting", true);
       setIsConverting(true);
     }
   };

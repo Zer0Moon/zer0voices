@@ -33,6 +33,7 @@ async def handler(websocket):
         print(f"[Zer0Voices] Client disconnected")
 
 async def handle_message(websocket, data):
+    global is_converting, current_input_device, current_output_device
     msg_type = data.get("type")
 
     if msg_type == "ping":
@@ -61,9 +62,15 @@ async def handle_message(websocket, data):
         global current_output_device
         current_output_device = data.get("payload")
         await websocket.send(json.dumps({"type": "output_device_set", "payload": current_output_device}))
+    elif msg_type == "set_converting":
+        global is_converting
+        is_converting = data.get("payload", False)
+        await websocket.send(json.dumps({"type": "converting_state", "payload": is_converting}))
 
     elif msg_type == "start_stream":
+        is_converting = engine.is_loaded
         await start_audio_stream(websocket)
+
     elif msg_type == "load_model":
         pth_path = data.get("payload")
         await handle_load_model(websocket, pth_path)
@@ -104,48 +111,73 @@ def get_gpu_info():
         return {"available": False, "error": str(e)}
 
 async def start_audio_stream(websocket):
-    global audio_stream, current_input_device
+    global audio_stream, current_input_device, current_output_device
     loop = asyncio.get_event_loop()
 
     await stop_audio_stream()
 
-    def audio_callback(indata, frames, time, status):
-        rms = float(np.sqrt(np.mean(indata**2)))
-        waveform = indata[::4, 0].tolist()
+    def audio_callback(indata, outdata, frames, time, status):
+        audio = indata[:, 0].copy()
+
+        # Run RVC conversion if model is loaded
+        if engine.is_loaded and is_converting:
+            try:
+                converted = engine.convert(audio, 44100, pitch_shift=0)
+                # Make sure output length matches
+                if len(converted) >= frames:
+                    outdata[:, 0] = converted[:frames]
+                else:
+                    out = np.zeros(frames)
+                    out[:len(converted)] = converted
+                    outdata[:, 0] = out
+            except Exception as e:
+                print(f"[Audio] Conversion error: {e}")
+                outdata[:, 0] = audio
+        else:
+            # Passthrough — play raw mic
+            outdata[:, 0] = audio
+
+        # Fill second channel if stereo output
+        if outdata.shape[1] > 1:
+            outdata[:, 1] = outdata[:, 0]
+
+        # Send waveform to frontend
+        rms = float(np.sqrt(np.mean(audio**2)))
+        waveform = audio[::4].tolist()
         asyncio.run_coroutine_threadsafe(
             broadcast({
                 "type": "audio_data",
                 "payload": {
                     "waveform": waveform,
                     "rms": rms,
-                    "converting": is_converting
+                    "converting": engine.is_loaded and is_converting
                 }
             }),
             loop
         )
 
     try:
-        audio_stream = sd.InputStream(
-            device=current_input_device,
-            channels=1,
+        audio_stream = sd.Stream(
+            device=(current_input_device, current_output_device),
+            channels=(1, 2),
             samplerate=44100,
             blocksize=2048,
-            callback=audio_callback
+            callback=audio_callback,
+            dtype="float32"
         )
         audio_stream.start()
         await websocket.send(json.dumps({"type": "stream_started"}))
-        print(f"[Zer0Voices] Audio stream started on device {current_input_device}")
+        print(f"[Zer0Voices] Duplex stream started — in:{current_input_device} out:{current_output_device}")
     except Exception as e:
         await websocket.send(json.dumps({"type": "stream_error", "payload": str(e)}))
         print(f"[Zer0Voices] Stream error: {e}")
-
 async def stop_audio_stream():
     global audio_stream
     if audio_stream:
         audio_stream.stop()
         audio_stream.close()
         audio_stream = None
-        
+
 async def handle_load_model(websocket, pth_path: str):
     await websocket.send(json.dumps({
         "type": "model_loading",
